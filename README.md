@@ -7,10 +7,10 @@ JAVASCRIPT AST HOOK JS逆向快速定位 <br>
 **这个项目是在匆忙情况下修改它人而成，为了提取拼多多 anti-content，浪费了太多时间了。**
 
 # 文件说明
-JSON.prune.js 用于浏览打印出所有属性，如：```JSON.prune(window.screen, {inheritedProperties:true})```
-webpack_mixer.js 用于webpack包合并，如：```node webpack_mixer.js -l loader.js -m module.js```
-env_add.js 用于补环境，内有注释，需要改一下就可以。如：```node env_add.js```
-server.js 用于代理服务器，，如：```node server.js```
+- JSON.prune.js 用于浏览打印出所有属性，如：```JSON.prune(window.screen, {inheritedProperties:true})```
+- webpack_mixer.js 用于webpack包合并，如：```node webpack_mixer.js -l loader.js -m module.js -m module1.js -m module2.js```
+- env_add.js 用于补环境，内有注释，需要改一下就可以。如：```node env_add.js```
+- server.js 用于代理服务器，，如：```node server.js```
 
 # 浏览器内使用
 
