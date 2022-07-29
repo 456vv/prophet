@@ -6,6 +6,8 @@ JAVASCRIPT AST HOOK JS逆向快速定位 <br>
 
 **这个项目是在匆忙情况下修改它人而成，为了提取拼多多 anti-content，浪费了太多时间了。**
 
+**发现一个特奇怪问题，就是那个库存在anti-content文件的，github库都会被删除或连账号都被删除，所以我也删除了这个文件，不就是个破anti-content文件吗！小白又玩不出新花样，高手你又防不往。看来管控无处不在，有想法->起火花->烧起来，前面封止了就没后成的事了。**
+
 # 文件说明
 - JSON.prune.js 用于浏览打印出所有属性，如：```JSON.prune(window.screen, {inheritedProperties:true})```
 - webpack_mixer.js 用于webpack包合并，如：```node webpack_mixer.js -l loader.js -m module.js -m module1.js -m module2.js```
