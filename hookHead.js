@@ -29,7 +29,7 @@ if (!$W$.$H$ || !$W$.$S$) {
 			return xhr.responseText;
 		}
 		let rs_ok = ($W$.$rcode$ && (new RegExp($W$.$rcode$,"g")).test(functionType)),
-			rv_ok = ($W$.$rvalue$ && (new RegExp($W$.$rval$,"g")).test(String(s)));
+			rv_ok = ($W$.$rval$ && (new RegExp($W$.$rval$,"g")).test(String(s)));
 		if(rs_ok || rv_ok){
 			let trackObj = {};
 			Error.captureStackTrace(trackObj);
