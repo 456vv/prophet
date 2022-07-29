@@ -18,10 +18,10 @@ JAVASCRIPT AST HOOK JS逆向快速定位 <br>
 
 > 为什么要使用\$符号作为变量，原因是以最少字符串，并不与其它全局变量冲突。
 
-- ```$W$.$hooked$=true``` 表示开启记录 。可以设置：```localStorage.getItem("$hooked$")```
+- ```$W$.$hooked$=true``` 表示开启记录 。可以设置：```localStorage.setItem("$hooked$","true")```
 - ```$W$.$S$("abcd")``` 表示查找字符串，如果找到将停止记录，原因是记录存储会吃完你的浏览器内存。
-- ```$W$.$rcode$="正则"``` 表示正则匹配的代码文本，并在控制台打印出来。可以设置：```localStorage.getItem("$rcode$")```
-- ```$W$.$rval$="正则"``` 表示正则匹配的值，并在控制台打印出来。可以设置：```localStorage.getItem("$rval$")```
+- ```$W$.$rcode$="正则"``` 表示正则匹配的代码文本，并在控制台打印出来。可以设置：```localStorage.setItem("$rcode$","正则")```
+- ```$W$.$rval$="正则"``` 表示正则匹配的值，并在控制台打印出来。可以设置：```localStorage.setItem("$rval$","正则")```
 
 # 使用方法
 
