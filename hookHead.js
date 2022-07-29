@@ -12,7 +12,7 @@ setTimeout(function(){
 	}
 },1000)
 if (!$W$.$H$ || !$W$.$S$) {
-	$W$.$rcode$ = localStorage.getItem("$code$"),localStorage.removeItem("$code$");
+	$W$.$rcode$ = localStorage.getItem("$rcode$"),localStorage.removeItem("$rcode$");
 	$W$.$rval$ =  localStorage.getItem("$rval$"),localStorage.removeItem("$rval$");
 	$W$.$hooked$ = localStorage.getItem("$hooked$"),localStorage.removeItem("$hooked$");
 		
