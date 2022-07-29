@@ -5,8 +5,17 @@ if (!$W$.MyDb) {
 	$W$.MyDb = {};
 	$W$.MyXhr = XMLHttpRequest;
 }
-
+setTimeout(function(){
+	$W$.onerror=function(){
+		console.log("onerror: ", arguments)
+		return true;
+	}
+},1000)
 if (!$W$.$H$ || !$W$.$S$) {
+	$W$.$rcode$ = localStorage.getItem("$code$"),localStorage.removeItem("$code$");
+	$W$.$rval$ =  localStorage.getItem("$rval$"),localStorage.removeItem("$rval$");
+	$W$.$hooked$ = localStorage.getItem("$hooked$"),localStorage.removeItem("$hooked$");
+		
 	$W$.$H$ = function (s, n, functionType) {
 		if (typeof s !== "string") {
 			return s;
@@ -18,6 +27,14 @@ if (!$W$.$H$ || !$W$.$S$) {
 			xhr.open("POST", "/handleJsCode", false);
 			xhr.send(s);
 			return xhr.responseText;
+		}
+		let rs_ok = ($W$.$rcode$ && (new RegExp($W$.$rcode$,"g")).test(functionType)),
+			rv_ok = ($W$.$rvalue$ && (new RegExp($W$.$rval$,"g")).test(String(s)));
+		if(rs_ok || rv_ok){
+			let trackObj = {};
+			Error.captureStackTrace(trackObj);
+			let stack = trackObj.stack.split("\n")[2];
+			console.log(s, functionType, stack);
 		}
 		if(!$W$.$hooked$){
 			return s
