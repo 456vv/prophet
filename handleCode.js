@@ -8,158 +8,181 @@ const cheerio = require("cheerio");
 const fs = require("fs");
 const hookHeadJsCode = fs.readFileSync("./hookHead.js").toString();
 
-function handleJsCode(jsCode, noHead) {
-	var ast = parser.parse(jsCode, { sourceType: "unambiguous" });
-
-	traverse(
-		ast,
-		{
-			// 补for in 括号{}
-			ForInStatement(path) {
-				if (path.node.body && path.node.body.type !== "BlockStatement") {
-					path.node.body = t.BlockStatement([path.node.body]);
-				}
-			},
-
-			// 补while 括号{}
-			WhileStatement(path) {
-				if (path.node.body && path.node.body.type !== "BlockStatement") {
-					path.node.body = t.BlockStatement([path.node.body]);
-				}
-			},
-
-			// 补for(;;;) 括号{}
-			ForStatement(path) {
-				if (path.node.body && path.node.body.type !== "BlockStatement") {
-					path.node.body = t.BlockStatement([path.node.body]);
-				}
-			},
-
-			// 补if else 括号{}
-			IfStatement(path) {
-				if (path.node.consequent && path.node.consequent.type !== "BlockStatement") {
-					path.node.consequent = t.BlockStatement([path.node.consequent]);
-				}
-
-				if (path.node.alternate && path.node.alternate.type !== "BlockStatement") {
-					path.node.alternate = t.BlockStatement([path.node.alternate]);
-				}
-			},
-
-			// hook return 值
-			ReturnStatement(path) {
-				if (path.node.argument != null) {
-					path.node.argument = t.CallExpression(t.Identifier("$W$.$H$"), [path.node.argument, t.NumericLiteral(2), t.StringLiteral(path.toString().substring(0, 100))]);
-				}
-			},
-
-			// hook 赋值
-			AssignmentExpression(path) {
-				if (path.node.operator == "=") {
-					path.node.right = t.CallExpression(t.Identifier("$W$.$H$"), [path.node.right, t.NumericLiteral(2), t.StringLiteral(path.toString().substring(0, 100))]);
-				}
-			},
-
-			// hook 声明定义 值
-			VariableDeclarator(path) {
-				if (path.node.init != null) {
-					path.node.init = t.CallExpression(t.Identifier("$W$.$H$"), [path.node.init, t.NumericLiteral(2), t.StringLiteral(path.toString().substring(0, 100))]);
-				}
-			},
-
-			// hook 字典value
-			ObjectExpression(path) {
-				for (let i = 0; i < path.node.properties.length; i++) {
-					if (path.node.properties[i].type != "ObjectMethod") {
-						path.node.properties[i].value = t.CallExpression(t.Identifier("$W$.$H$"), [
-							path.node.properties[i].value,
-							t.NumericLiteral(2),
-							t.StringLiteral(path.toString().substring(0, 100)),
-						]);
-					}
-				}
-				// t.CallExpression(t.Identifier("$W$.$H$"),[path.node.value,t.NumericLiteral(2)])
-			},
-
-			//eval 和 Function
-			CallExpression(path) {
-				if (path.node.callee.name == "eval" && path.node.arguments.length > 0) {
-					if (path.node.arguments[0].type == "StringLiteral") {
-						try {
-							let code = path.node.arguments[0].value;
-							code = "(function(){" + code + "})()";
-							path.node.arguments[0].value = handleJsCode(code, true).replace("function tingHook() {\n  ", "").replace("\n})(tingHook);", "");
-						} catch (err) {
-							console.log("CallExpression解析失败:", err, path.node.arguments[0].value);
-						}
-					}
-
-					if (path.node.arguments[0].type !== "StringLiteral") {
-						path.node.arguments[0] = t.CallExpression(t.Identifier("$W$.$H$"), [path.node.arguments[0], t.NumericLiteral(3), t.StringLiteral("eval")]);
-					}
-				}
-
-				//Function('a', 'b', 'return(a+b);')
-				if (path.node.callee.name == "Function" && path.node.arguments.length) {
-					if (path.node.arguments[path.node.arguments.length - 1].type == "StringLiteral") {
-						try {
-							let code = path.node.arguments[path.node.arguments.length - 1].value;
-							code = "(function tingHook(){" + code + "})(tingHook)";
-
-							path.node.arguments[path.node.arguments.length - 1].value = handleJsCode(code, true).replace("(function tingHook() {\n  ", "").replace("\n})(tingHook);", "");
-						} catch (err) {
-							console.log("NewExpression解析失败:", err, path.node.arguments[path.node.arguments.length - 1].value);
-						}
-					}
-
-					//var ret = 'return(a+b);',fun2 = Function('a', 'b', ret);fun2(8, 6);
-					if (path.node.arguments[path.node.arguments.length - 1].type !== "StringLiteral") {
-						path.node.arguments[path.node.arguments.length - 1] = t.CallExpression(t.Identifier("$W$.$H$"), [
-							path.node.arguments[path.node.arguments.length - 1],
-							t.NumericLiteral(3),
-							t.StringLiteral("Function"),
-						]);
-					}
-				}
-			},
-
-			//new Function
-			NewExpression(path) {
-				//Function('a', 'b', 'return(a+b);')
-				if (path.node.callee.name == "Function" && path.node.arguments.length) {
-					if (path.node.arguments[path.node.arguments.length - 1].type == "StringLiteral") {
-						try {
-							let code = path.node.arguments[path.node.arguments.length - 1].value;
-							code = "(function tingHook(){" + code + "})(tingHook)";
-
-							path.node.arguments[path.node.arguments.length - 1].value = handleJsCode(code, true).replace("(function tingHook() {\n  ", "").replace("\n})(tingHook);", "");
-						} catch (err) {
-							console.log("NewExpression解析失败:", err, path.node.arguments[path.node.arguments.length - 1].value);
-						}
-					}
-
-					//new Function('a', 'b', 'return(a+b);')
-					if (path.node.arguments[path.node.arguments.length - 1].type !== "StringLiteral") {
-						path.node.arguments[path.node.arguments.length - 1] = t.CallExpression(t.Identifier("$W$.$H$"), [
-							path.node.arguments[path.node.arguments.length - 1],
-							t.NumericLiteral(3),
-							t.StringLiteral("Function"),
-						]);
-					}
-				}
-			},
-		},
-		false
-	);
-
-	let head_code = hookHeadJsCode;
-
-	let JsCode = generator(ast)["code"];
-
-	return noHead ? JsCode : head_code + JsCode;
+function errLog (str, err, v) {
+	console.log(str, err, v, generator(v).code);
+}
+function autoType (value, path) {
+	switch (value.type) {
+		case "Identifier":
+			path = value.name; break;
+		case "StringLiteral":
+			path = value.value; break;
+		case "NullLiteral":
+			path = "null"; break;
+		case "NumericLiteral":
+			path = String(value.value); break;
+		default:
+			path = generator(value).code
+	}
+	return path || ""
+}
+function hookFunc (value, path, type) {
+	var args = [value, t.stringLiteral(autoType(value, path).toString().substring(0, 100))]
+	if (type) {
+		args.push(t.numericLiteral(type))
+	}
+	return t.callExpression(t.identifier("$H"), args);
+}
+function availableType (type, func) {
+	switch (type) { case "Identifier": case "StringLiteral": case "NumericLiteral": case "CallExpression": case "MemberExpression": return func() }
 }
 
-function handleHtmlCode(htmlCode) {
+
+function includeAllCallExpression (node, path) {
+	if (node.type == "CallExpression") {
+		if (node.callee.type == "Identifier" && node.callee.name == "$H") {
+			return
+		}
+		node.arguments.forEach(function (v, i) {
+			node.arguments[i] = hookFunc(v, path)
+		})
+	}
+}
+
+var visitor_for = ({ node }) => {
+	if (node.body && node.body.type != "blockStatement") {
+		node.body = t.blockStatement([node.body]);
+	}
+}, visitor_function = (path) => {
+	let args = path.node.arguments;
+
+	//eval("1")
+	if (path.node.callee.name == "eval" && args.length) {
+		if (args[0].type == "StringLiteral") {
+			try {
+				args[0].value = handleJsCode(args[0].value, true)
+			} catch (err) {
+				console.log("CallExpression解析失败:", err, args[0].value);
+			}
+			return
+		}
+		//其它变量
+		args[0] = hookFunc(args[0], path, 1);
+		return
+	}
+
+	//new Function('a', 'b', 'return(a+b);')
+	if (path.node.callee.name == "Function" && args.length) {
+		let last = args.length - 1;
+		if (args[last].type == "StringLiteral") {
+			try {
+				args[last].value = handleJsCode(args[last].value, true)
+			} catch (err) {
+				console.log("NewExpression解析失败:", err, args[last].value);
+			}
+			return
+		}
+
+		//var ret = 'return(a+b);',fun2 = Function('a', 'b', ret);fun2(8, 6);
+		args[last] = hookFunc(args[last], path, 1);
+		return
+	}
+
+	includeAllCallExpression(path.node, path)
+}
+
+var visitor = {
+	Identifier (path) {
+	},
+	enter (path) {
+	},
+	exit (path) {
+
+	},
+	// 补 for 括号{}
+	ForInStatement: visitor_for,
+	ForOfStatement: visitor_for,
+	ForStatement: visitor_for,
+	// 补while 括号{}
+	WhileStatement: visitor_for,
+
+	/// 补if else 括号{}
+	IfStatement ({ node, path }) {
+		if (node.consequent && node.consequent.type !== "BlockStatement") {
+			node.consequent = t.BlockStatement([node.consequent]);
+		}
+		if (node.alternate && node.alternate.type !== "BlockStatement") {
+			node.alternate = t.BlockStatement([node.alternate]);
+		}
+	},
+
+	// hook return 值
+	ReturnStatement (path) {
+		if (path.node.argument != null) {
+			path.node.argument = hookFunc(path.node.argument, path)
+		}
+	},
+
+	// hook 赋值
+	AssignmentExpression (path) {
+		if (path.node.operator == "=") {
+			path.node.right = hookFunc(path.node.right, path)
+		}
+	},
+
+	// hook 声明定义 值
+	VariableDeclarator (path) {
+		if (path.node.init != null) {
+			path.node.init = hookFunc(path.node.init, path)
+		}
+	},
+
+	// hook 字典value
+	ObjectExpression (path) {
+		var v1;
+		try {
+			path.node.properties.forEach(function (v) {
+				if (v.type == "ObjectProperty") {
+					v1 = v;
+					availableType(v.value.type, function () {
+						v.value = hookFunc(v.value, path)
+					})
+				}
+			})
+		} catch (err) {
+			errLog("ObjectExpression解析失败:", err, v1);
+		}
+	},
+
+	//eval 和 Function
+	CallExpression: visitor_function,
+
+	//new Function
+	NewExpression: visitor_function,
+
+	//函数参数
+	FunctionDeclaration (path) {
+		return
+		var topVariable = []
+		path.node.params.forEach(function (v) {
+			if (v.type == "Identifier") {
+				var newName = "$" + v.name + "$"
+				topVariable.push(t.variableDeclarator(t.identifier(v.name), t.identifier(newName)))
+				v.name = newName
+			}
+		})
+		path.get("body").unshiftContainer("body", t.variableDeclaration("var", topVariable))
+	},
+}
+function handleJsCode (jsText, noHead) {
+	var ast = parser.parse(jsText, { sourceType: "unambiguous" });
+	traverse(ast, visitor, false);
+
+	let JsCode = generator(ast).code;
+	return noHead ? JsCode : hookHeadJsCode + JsCode;
+}
+
+function handleHtmlCode (htmlCode) {
 	let $ = cheerio.load(htmlCode);
 	let scriptList = $("script");
 
@@ -186,7 +209,6 @@ function handleHtmlCode(htmlCode) {
 
 		try {
 			newJsCode = handleJsCode(newJsCode, addHookHeadJsCode);
-
 			addHookHeadJsCode = true;
 		} catch (err) {
 			console.log("handleHtmlCode解析失败：", err, newJsCode);
@@ -195,13 +217,18 @@ function handleHtmlCode(htmlCode) {
 
 		var newScript = cheerio.load("<script>" + newJsCode + "</script>")("script");
 		newScript.attribs = script.attribs;
-
 		$(script).replaceWith(newScript);
 	}
-	let newHtmlCode = $.html();
 
-	return newHtmlCode;
+	return $.html();
 }
 
-module.exports.handleJsCode = handleJsCode;
-module.exports.handleHtmlCode = handleHtmlCode;
+function format (jsText) {
+	var ast = parser.parse(jsText, { sourceType: "unambiguous" });
+	return generator(ast).code
+}
+module.exports = {
+	format,
+	jsCode: handleJsCode,
+	htmlCode: handleHtmlCode,
+}

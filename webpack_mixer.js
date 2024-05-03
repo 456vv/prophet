@@ -100,7 +100,6 @@ function run(loader_path, out_path, modular_path) {
         });
 
         let modular_ast = parser.parse(jscode);
-        console.log(modular_ast)
         modular_ast.program.body[0].expression.arguments[0].elements.forEach(function (item2, index2) {
             if (item2.type === 'ArrayExpression'){
                 item2.elements.forEach(function (item3, index3) {
