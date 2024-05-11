@@ -1,16 +1,17 @@
-(function (win) {
-	if (!win.$W) {
-		let W = win.$W = win,
-			db = win.$DB = {},
+!(function (win) {
+	if (!win.$H) {
+		let db = {},
+			filter = {},
+			before_text = "",
 			MyXhr = XMLHttpRequest,
-			captureStackTrace = Error.captureStackTrace;
+			captureStackTrace = Error.captureStackTrace,
+			log = console.log;
 		Error.captureStackTrace = function (s) { s.stack = "" };
 
 		function LS (a) {
-			W[a] = localStorage.getItem(a),
-				localStorage.removeItem(a)
+			win[a] = localStorage.getItem(a)
 		}
-		Object.defineProperty(W, "onerror", {
+		Object.defineProperty(win, "onerror", {
 			set: function () { }
 		}),
 			LS("$rcode"),//判断代码
@@ -18,7 +19,19 @@
 			LS("$debugger"),//断点
 			LS("$record");//记录
 
-		function caputeRecord (s, _stack) {
+		function getFilter (text) {
+			let text_ = (text + "_"), f = filter[text_]
+			function has (before_text) {
+				if (!f) { return false }
+				return f.indexOf(before_text) != -1
+			}
+			function add (before_text) {
+				if (!f) { f = filter[text_] = [] }
+				!has(before_text) && f.push(before_text)
+			}
+			return { has, add }
+		}
+		function caputeRecord (s, _stack, text) {
 			if (!(db[s] instanceof Array)) {
 				db[s] = [];
 			}
@@ -26,72 +39,125 @@
 			let arr = db[s], exists = false;
 			for (let i = 0; i < arr.length; i++) {
 				if (arr[i].stack == _stack) {
-					if (arr[i].count > 1000) {
-						console.log("怀疑进入循环，可使用$goto跳过:", _stack)
-						debugger;
+					if (arr[i].count > 20) {//防止在循环内操作，限20次足够了。
+						getFilter(text).add(before_text)
 					}
 					arr[i].count++;
 					exists = true;
 					break;
 				}
 			}
-			var trackObj = {}
 			if (!exists) {
-				trackObj.count = 1;
-				trackObj.stack = _stack;
-				db[s].push(trackObj)
+				db[s].push({
+					count: 1,
+					stack: _stack,
+				})
 			}
 		}
+		win.$H = function (s, text, type) {
+			if (typeof text == "number") { type = text; text = undefined; }
+			if (text == undefined) { text = s }
+			let st = (typeof s == "string"), sn = (typeof s == "number");
 
-		W.$H = function (s, text, type) {
-			let st = (typeof s == "string"), nt = typeof s == "number";
-
-			var goto = (W.$goto && (new RegExp(W.$goto).test(text)))
-			if (goto) {
-				W.$goto = null
-				debugger
+			if (!(st || sn) || getFilter(text).has(before_text)) {
+				before_text = text
+				return s;
 			}
-			if (!st && !nt || (W.$goto && !goto)) { return s; }
 			if (type == 1) {
-				console.log("解析(" + text + "): ", s);
 				let xhr = new MyXhr();
-				xhr.open("POST", "/handleJsCode", false);
+				xhr.open("POST", "/hook_jscode", false);
 				xhr.send(s);
 				return xhr.responseText;
 			}
 
-			let rs_ok = (W.$rcode && new RegExp(W.$rcode).test(text)),
-				rv_ok = (W.$rval && new RegExp(W.$rval).test(String(s))),
-				trackObj = {}, _stack = "";
-
-			if (rs_ok || rv_ok || W.$record) {
+			let rv_ok = (st && win.$rval && new RegExp(win.$rval).test(String(s))),
+				rs_ok = (win.$rcode && new RegExp(win.$rcode).test(text)),
+				trackObj = {};
+			if (rs_ok || rv_ok || (win.$record && st)) {
 				captureStackTrace(trackObj);
-				_stack = trackObj.stack.split("\n")[2];
-				_stack = "源代码:" + text + " " + _stack;
+				var _stack = text + " => " + trackObj.stack.split("\n")[2];
 
 				if (rs_ok || rv_ok) {
-					console.log(s, _stack);
-					if (W.$debugger) { debugger }
+					log(s, " => ", _stack);
+					//if(typeof win.$debug == "function"){
+					//	win.$debug(s, text, type)
+					//}
+					if (win.$debugger) { debugger }
 				}
-				if (W.$record) {
-					caputeRecord(s, _stack)
+				if (win.$record) {
+					let val = rv_ok ? win.$rval : rs_ok ? win.$rcode : s;
+					caputeRecord(val, _stack, text)
 				}
 			}
+			before_text = text
 			return s;
 		};
-		W.$S = function (s) {
-			let arr = db[s];
-			if (arr) {
-				W.$record = false;
-				console.log("出现次数\t\t\t\t\t\t\t\t位置地址");
-				for (let i = 0; i < arr.length; i++) {
-					if (arr[i]) {
-						console.log(arr[i].count, "\t\t\t\t\t\t\t\t", arr[i].stack);
+
+		var bindf = win.$onfunc = {};
+		win.$F = function (func, args, text) {
+			if (bindf.hasOwnProperty(text)) {
+				return bindf[text](func, args);
+			}
+			var is_win = func.name in win && win[func.name] == func;
+			return func.apply(is_win ? win : func, args)
+		};
+		var bindm = win.$onmethod = {};
+		win.$M = function (pro, name, args, text) {
+			if (bindm.hasOwnProperty(text)) {
+				return bindm[text](pro, name, args);
+			}
+			if (name == "apply") {
+				return pro.apply(args[0], args[1])
+			}
+			if (name == "call") {
+				return pro.apply(args[0], args.slice(1))
+			}
+			return pro[name].apply(pro, args)
+		};
+		win.$S = function (s) {
+			var arr = [];
+			if (typeof s == "object") {
+				for (var k in db) {
+					if (s.test(k)) {
+						arr.push({
+							name: k,
+							position: db[k]
+						})
 					}
 				}
-				return;
+			} else if (!db[s]) {
+				log("无数据！！");
+				return
+			} else {
+				arr = [{
+					name: s,
+					position: db[s]
+				}]
 			}
-			console.log("无数据！！");
+			for (let i = 0; i < arr.length; i++) {
+				log("出现次数\t\t\t\t\t\t\t\t位置地址");
+				let name = arr[i].name, position = arr[i].position;
+				for (let ii = 0; ii < position.length; ii++) {
+					if (position[ii]) {
+						log(String(position[ii].count), "\t\t\t\t\t\t\t\t", name, " => ", position[ii].stack);
+					}
+				}
+			}
 		};
+		win.$C = function () {
+			filter = {}
+			db = {}
+		}
+		function onExit (e) {
+			if (win.$debugger) {
+				debugger;
+			}
+		}
+		win.addEventListener("unload", onExit)
+		win.addEventListener("beforeunload", onExit)
+
+		if (win.$debugger) {
+			debugger;
+		}
 	}
 })(window);

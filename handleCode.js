@@ -2,9 +2,7 @@ const parser = require("@babel/parser");
 const traverse = require("@babel/traverse").default;
 const t = require("@babel/types");
 const generator = require("@babel/generator").default;
-
 const cheerio = require("cheerio");
-
 const fs = require("fs");
 const hookHeadJsCode = fs.readFileSync("./hookHead.js").toString();
 
@@ -27,27 +25,66 @@ function autoType (value, path) {
 	return path || ""
 }
 function hookFunc (value, path, type) {
-	var args = [value, t.stringLiteral(autoType(value, path).toString().substring(0, 100))]
+	var args = [value]
+	if (value.type != "StringLiteral" && value.type != "NumericLiteral") {
+		args.push(t.stringLiteral(autoType(value, path).toString().substring(0, 100)))
+	}
 	if (type) {
 		args.push(t.numericLiteral(type))
 	}
 	return t.callExpression(t.identifier("$H"), args);
 }
-function availableType (type, func) {
-	switch (type) { case "Identifier": case "StringLiteral": case "NumericLiteral": case "CallExpression": case "MemberExpression": return func() }
+function availableType (type, success, fail) {
+	switch (type) { case "Identifier": case "StringLiteral": case "NumericLiteral": case "CallExpression": case "MemberExpression": case "BinaryExpression": return success() }
+	fail && fail(type)
 }
 
-
+function includeAllObjectProperty (node, path) {
+	node.properties.forEach(function (v) {
+		if (v.type == "ObjectProperty") {
+			availableType(v.value.type, function () {
+				v.value = hookFunc(v.value, path)
+			})
+		}
+	})
+}
 function includeAllCallExpression (node, path) {
 	if (node.type == "CallExpression") {
-		if (node.callee.type == "Identifier" && node.callee.name == "$H") {
+		if (node.callee.type == "Identifier" && node.callee.name.match(/^\$[FHM]$/)) {
 			return
 		}
-		node.arguments.forEach(function (v, i) {
-			node.arguments[i] = hookFunc(v, path)
-		})
+		var f_args = node.arguments
+		if (node.callee.type == "Identifier") {
+			//A(1,2) to F(A,[1,2])
+
+			var f_name = node.callee.name,
+				f_code = generator(node).code.toString().substring(0, 100)
+			node.callee.name = "$F"
+			node.arguments = [t.identifier(f_name), t.arrayExpression(f_args), t.stringLiteral(f_code)]
+		} else if (node.callee.type == "MemberExpression") {
+			//A.B.C["D"](1,2) to $M(A.B.C,"D",[1,2])
+
+			//A.B.C(1,2) >>C的类型是identifter
+			//A.B["C"](1,2) >>C的类型是stringLiteral
+			var o_name = node.callee.object,
+				m_name = node.callee.property,
+				f_code = generator(node).code.toString().substring(0, 100)
+
+			if (!node.callee.computed && m_name.type == "Identifier") {
+				m_name = t.stringLiteral(m_name.name)
+			}
+			node.callee = t.identifier("$M")
+			node.arguments = [o_name, m_name, t.arrayExpression(f_args), t.stringLiteral(f_code)]
+		} else {
+			node.arguments.forEach(function (v, i) {
+				availableType(v.type, function () {
+					node.arguments[i] = hookFunc(v, path)
+				})
+			})
+		}
 	}
 }
+
 
 var visitor_for = ({ node }) => {
 	if (node.body && node.body.type != "blockStatement") {
@@ -89,6 +126,14 @@ var visitor_for = ({ node }) => {
 	}
 
 	includeAllCallExpression(path.node, path)
+}, visitor_object = (path) => {
+	includeAllObjectProperty(path.node, path)
+}, visitor_array = (path) => {
+	path.node.elements.forEach(function (av, ai) {
+		availableType(av.type, function () {
+			path.node.elements[ai] = hookFunc(av, path)
+		})
+	})
 }
 
 var visitor = {
@@ -119,40 +164,35 @@ var visitor = {
 	// hook return 值
 	ReturnStatement (path) {
 		if (path.node.argument != null) {
-			path.node.argument = hookFunc(path.node.argument, path)
+			availableType(path.node.argument.type, function () {
+				path.node.argument = hookFunc(path.node.argument, path)
+			})
 		}
 	},
 
 	// hook 赋值
 	AssignmentExpression (path) {
 		if (path.node.operator == "=") {
-			path.node.right = hookFunc(path.node.right, path)
+			availableType(path.node.right.type, function () {
+				path.node.right = hookFunc(path.node.right, path)
+
+			})
 		}
 	},
 
 	// hook 声明定义 值
 	VariableDeclarator (path) {
 		if (path.node.init != null) {
-			path.node.init = hookFunc(path.node.init, path)
+			availableType(path.node.init.type, function () {
+				path.node.init = hookFunc(path.node.init, path)
+			})
 		}
 	},
 
 	// hook 字典value
-	ObjectExpression (path) {
-		var v1;
-		try {
-			path.node.properties.forEach(function (v) {
-				if (v.type == "ObjectProperty") {
-					v1 = v;
-					availableType(v.value.type, function () {
-						v.value = hookFunc(v.value, path)
-					})
-				}
-			})
-		} catch (err) {
-			errLog("ObjectExpression解析失败:", err, v1);
-		}
-	},
+	ObjectExpression: visitor_object,
+
+	ArrayExpression: visitor_array,
 
 	//eval 和 Function
 	CallExpression: visitor_function,
