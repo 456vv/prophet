@@ -1,39 +1,38 @@
 !function (t, e) {
-  "function" == typeof define && define.amd ? define(["exports"], e) : e("object" == typeof exports && "string" != typeof exports.nodeName ? module.exports : t);
+	"function" == typeof define && define.amd ? define(["exports"], e) : e("object" == typeof exports && "string" != typeof exports.nodeName ? module.exports : t);
 }(this, function (t) {
-	var new_window_paths = {},isPrint=false;
+	var new_window_paths = {}, isPrint = false, isTest = false, disabledPrint = true;
 	function isPepeatPath (obj, path, vlaue) { if (obj.hasOwnProperty(path)) { return true }; obj[path] = vlaue; }
 	function addDefineProperty (path, vlaue) {
 		isPepeatPath(new_window_paths, path, vlaue)
 	}
-	function printLogName (target) {
-		if(target == global){
-			return "window"
-		}
-		var matched = target.toString().match(/\[object (\w+)\]/)
-		return matched? matched[1]:target.name || "undefined"
-	}
-	function printLogPath (key, property) {return key + "." + String(property); }
+	function printLogPath (key, property) { return key + "." + String(property); }
 	function vmProxy (object, key) {
-		if(object instanceof vmProxy){
-			return object
-		}
 		return new Proxy(object, {
 			set: function (target, property, value) {
 				var find = (property in target),
 					path = printLogPath(key, property)
-				if(!find){
+				if (!find) {
 					addDefineProperty(path, value)
-					isPrint && console.log("set: ", path, " = ", typeof value);
 				}
+
+				if (!disabledPrint && isTest || (isPrint && !find)) {
+					console.log("<-set: ", path, " = ", typeof value);
+				}
+
 				return Reflect.set(target, property, value)
 			},
 			get: function (target, property) {
-				var path =  printLogPath(key, property)
-				if (target[property] == undefined) {
+				var path = printLogPath(key, property),
+					find = !(target[property] == undefined)
+				if (!find) {
 					addDefineProperty(path)
-					isPrint && console.log("get: ", target[property], " = ", path);
 				}
+
+				if (!disabledPrint && isTest || (isPrint && !find)) {
+					console.log("get->: ", path, " = ", target[property]);
+				}
+
 				return target[property];
 			},
 			has: function (target, property) {
@@ -41,41 +40,53 @@
 					path = printLogPath(key, property)
 				if (!find) {
 					addDefineProperty(path)
-					isPrint && console.log("has: ",  path, " in ", find);
+				}
+				if (!disabledPrint && isTest || (isPrint && !find)) {
+					console.log("<has>: ", path, " in ", find);
 				}
 				return find;
 			}
 		});
 	}
 
-	function init(){
+	function internal (key, obj) {
+		return Function("$1", "$2", "return (typeof  window[$1] == 'undefined') ?  window[$1] = $2: window[$1]")(key, obj)
+	}
+	function init () {
+		if (global.defaultInit) {
+			return t
+		}
+		global.defaultInit = true
+		disabledPrint = false
 		window = vmProxy(global, "window");
-		document = vmProxy((typeof document == "undefined")?{}:document, "document")
-		location = vmProxy((typeof location == "undefined")?{}:location, "location")
-		navigator = vmProxy((typeof navigator == "undefined")?{}:navigator, "navigator")
-		history = vmProxy((typeof history == "undefined")?{}:history, "history")
-		screen = vmProxy((typeof screen == "undefined")?{}:screen, "screen")
-		chrome = vmProxy((typeof chrome == "undefined")?{}:chrome, "chrome")
-		chromeon = vmProxy((typeof chromeon == "undefined")?{}:chromeon, "chromeon")
-		localStorage = vmProxy((typeof localStorage == "undefined")?{}:localStorage, "localStorage")
-		sessionStorage = vmProxy((typeof sessionStorage == "undefined")?{}:sessionStorage, "sessionStorage")
+		document = vmProxy(internal("document", {}), "document")
+		location = vmProxy(internal("location", {}), "location")
+		navigator = vmProxy(internal("navigator", {}), "navigator")
+		history = vmProxy(internal("history", {}), "history")
+		screen = vmProxy(internal("screen", {}), "screen")
+		chrome = vmProxy(internal("chrome", {}), "chrome")
+		chromeon = vmProxy(internal("chromeon", {}), "chromeon")
+		localStorage = vmProxy(internal("localStorage", {}), "localStorage")
+		sessionStorage = vmProxy(internal("sessionStorage", {}), "sessionStorage")
+		disabledPrint = true
 		return t
 	}
 
-	function print(){
-		console.log(new_window_paths)
-		new_window_paths={}
+	function print (ok) {
+		isPrint = ok
+		new_window_paths = {}
 	}
-	function repair(){
+	function repair () {
 		return new_window_paths
 	}
-	function test(func){
-		isPrint=true
-		try{
-			return func.apply(func, Array.prototype.slice.call(arguments, 1))
-		}catch(err){
+	function test (func, no_print) {
+		isTest = typeof no_print != "undefined" ? no_print : true
+		try {
+			return func()
+		} catch (err) {
 			console.log(err)
 		}
+		isTest = false
 	}
 
 	t.print = print
