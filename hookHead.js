@@ -54,15 +54,17 @@
 				})
 			}
 		}
+		var bindh = win.$onhook = {};
 		win.$H = function (s, text, type) {
 			if (typeof text == "number") { type = text; text = undefined; }
 			if (text == undefined) { text = s }
+			s = bindf.hasOwnProperty(text) ? bindh[text](s, text, type) : s
 			let st = (typeof s == "string"), sn = (typeof s == "number");
-
 			if (!(st || sn) || getFilter(text).has(before_text)) {
 				before_text = text
 				return s;
 			}
+
 			if (type == 1) {
 				let xhr = new MyXhr();
 				xhr.open("POST", "/hook_jscode", false);
@@ -125,14 +127,15 @@
 						})
 					}
 				}
-			} else if (!db[s]) {
-				log("无数据！！");
-				return
-			} else {
+			} else if (db[s]) {
 				arr = [{
 					name: s,
 					position: db[s]
 				}]
+			}
+			if (!arr.length) {
+				log("无数据！！");
+				return
 			}
 			for (let i = 0; i < arr.length; i++) {
 				log("出现次数\t\t\t\t\t\t\t\t位置地址");
