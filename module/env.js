@@ -59,6 +59,7 @@
 		global.defaultInit = true
 		disabledPrint = false
 		window = vmProxy(global, "window");
+		self = vmProxy(global, "self");
 		document = vmProxy(internal("document", {}), "document")
 		location = vmProxy(internal("location", {}), "location")
 		navigator = vmProxy(internal("navigator", {}), "navigator")

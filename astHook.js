@@ -8,13 +8,13 @@ var config_path = "./config.json", conf = {};
 /*
 config:{
 	url:{
-		include://,
-		exclude://,
+		include:"/regexp/",
+		exclude:"/regexp/",
 	},
 	content:{
 		replace:{
 			url:{
-				"a":"b",
+				"/regexp/":"b",
 			}
 		},
 	}
@@ -88,14 +88,16 @@ function astHook (requestDetail, responseDetail) {
 		fileDir = "cache/" + hostname + "/" + port,
 		filePath = fileDir + "/" + path,
 		source_filePath = fileDir + "/source/" + path,
-		url_path = requestDetail.requestOptions.path;
+		url_path = requestDetail.requestOptions.path,
+		url_exclude = conf?.url?.exclude,
+		url_include = conf?.url?.include;
 
-	if (default_exclude.test(url_path) || conf?.url?.exclude?.test(url_path)) {
+	if (default_exclude.test(url_path) || url_exclude && toPattern(url_exclude).test(url_path)) {
 		if (fs.existsSync(source_filePath)) {
 			newResponse.body = fs.readFileSync(source_filePath, { flag: "r", encoding: "utf8", }).toString();
 		}
 
-		if (!conf?.url?.include.test(url_path)) {
+		if (url_include && !toPattern(url_include).test(url_path)) {
 			return { response: newResponse };
 		}
 	}

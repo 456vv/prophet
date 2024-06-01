@@ -81,9 +81,6 @@
 
 				if (rs_ok || rv_ok) {
 					log(s, " => ", _stack);
-					//if(typeof win.$debug == "function"){
-					//	win.$debug(s, text, type)
-					//}
 					if (win.$debugger) { debugger }
 				}
 				if (win.$record) {

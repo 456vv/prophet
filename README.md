@@ -9,9 +9,27 @@ JAVASCRIPT AST HOOK JS逆向快速定位，HOOK代码
 
 - JSON.prune.js 用于浏览打印出所有属性，如：`JSON.prune(window.screen, {inheritedProperties:true})`
 - webpack_mixer.js 用于webpack包合并，如：`node webpack_mixer.js -l loader.js -m module.js -m module1.js -m module2.js`
+- cookie.js 用于node.js 环境下处理cookie
+- xmlhttprequest.js 用于node.js 环境下处理ajax
 - env.js 用于补环境
 - server.js 用于代理服务器，，如：`node server.js`
 - config.json 用于过滤url和内容替换
+```
+	{
+		"url":{
+			"include":"/regexp/", #要包含的url地址。
+			"exclude":"/regexp/", #要排除的url地址。
+		},
+		"content":{
+			"replace":{
+				"baidu.com":{ 			 #网址字符串
+					"/a/":"b",     	 #正则查找a 替换成b，a可以是字符或正则表达式
+				}
+			},
+		}
+	}
+```
+
 
 # 浏览器内使用
 

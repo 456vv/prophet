@@ -1,0 +1,10 @@
+{
+	"content":{
+		"replace":{
+			"requirepkg":{
+				"xxxxxx":"下面这条是requirejs库加载模块的正则，他是通过toString()来得到模块路径。他这个写法让我花了两天时间才找到问题所在，草。",
+				"cjsRequireRegExp = /(.*)/g":"cjsRequireRegExp = /[^.](?:require,\\s\\[\\$H)\\s*\\(\\s*[\"']([^'\"\\s]+)[\"']\\s*\\)/g"
+			}
+		}
+	}
+}
